@@ -571,6 +571,32 @@ table.data tbody tr:hover { background: #f7f3ec; }
 .empty h2 { margin: 0 0 8px; font-size: 1.15rem; }
 .empty p { max-width: 520px; margin: 0 auto 16px; color: var(--muted); line-height: 1.55; }
 .empty-actions { justify-content: center; }
+.void {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  padding: 18px 12px 8px;
+}
+.void-svg { width: min(220px, 72vw); height: auto; display: block; overflow: visible; }
+.void-svg .float { transform-origin: 110px 76px; animation: void-float 3.4s ease-in-out infinite alternate; }
+.void h2 {
+  margin: 2px 0 6px;
+  font-size: 1.25rem;
+  letter-spacing: -0.04em;
+}
+.void p { max-width: 420px; margin: 0 0 14px; color: var(--muted); line-height: 1.55; }
+.void .btn { margin-bottom: 8px; }
+.void.compact { padding: 4px 8px 10px; }
+.void.compact .void-svg { width: 148px; }
+.void.compact h2 { font-size: 1.02rem; }
+.void.ink h2, .void.ink p { color: rgba(246, 241, 234, 0.72); }
+@keyframes void-float {
+  from { transform: translateY(0); }
+  to { transform: translateY(-5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .void-svg .float { animation: none; }
+}
 
 .modal-back, .command-overlay {
   position: fixed;
@@ -1184,20 +1210,27 @@ table.data tbody tr:hover { background: #f7f3ec; }
   gap: 12px;
 }
 .arrivage-card {
+  position: relative;
   width: 100%;
-  display: grid;
-  grid-template-columns: 128px minmax(0, 1fr);
   min-height: 188px;
-  padding: 0;
   overflow: hidden;
-  text-align: start;
   background: var(--card);
-  border: 0;
   border-radius: 28px;
   box-shadow: var(--shadow);
-  cursor: pointer;
 }
-.arrivage-card:has(.arrivage-faces) { grid-template-columns: 128px minmax(0, 1fr) auto; }
+.arrivage-open {
+  width: 100%;
+  min-height: 188px;
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  color: inherit;
+}
+.arrivage-open:has(.arrivage-faces) { grid-template-columns: 128px minmax(0, 1fr) auto; }
 .arrivage-mark {
   display: flex;
   flex-direction: column;
@@ -1238,6 +1271,176 @@ table.data tbody tr:hover { background: #f7f3ec; }
 .arrivage-track em { font-style: normal; font-family: Manrope, sans-serif; font-weight: 800; font-size: 1.05rem; letter-spacing: -0.04em; }
 .arrivage-faces { display: flex; align-items: center; gap: 8px; padding-inline-end: 18px; }
 .arrivage-faces img { width: 52px; height: 68px; object-fit: cover; border-radius: 14px; background: var(--soft); }
+.arrivage-actions {
+  position: absolute;
+  top: 12px;
+  inset-inline-end: 12px;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+}
+.arrivage-actions button {
+  border: 0;
+  background: rgba(255, 252, 248, 0.92);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 1px 0 rgba(20, 18, 16, 0.04), 0 8px 18px rgba(20, 18, 16, 0.08);
+}
+.arrivage-actions .danger { color: var(--accent); }
+.folio { display: grid; gap: 14px; }
+.folio-hero {
+  background: var(--ink);
+  color: #f6f1ea;
+  border-radius: 28px;
+  padding: 22px 26px 24px;
+}
+.folio-hero .eyebrow { color: rgba(246, 241, 234, 0.55); }
+.folio-num {
+  margin: 8px 0 0;
+  font-family: Manrope, sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.6rem, 5vw, 3.8rem);
+  letter-spacing: -0.06em;
+  line-height: 0.92;
+}
+.folio-sub { margin: 12px 0 0; color: rgba(246, 241, 234, 0.62); font-size: 0.9rem; }
+.folio-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.folio-card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  background: var(--card);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.folio-mark {
+  background: var(--soft);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 16px 14px;
+}
+.folio-mark b {
+  font-family: Manrope, sans-serif;
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  line-height: 0.9;
+}
+.folio-mark small { margin-top: 8px; color: var(--muted); font-size: 0.78rem; line-height: 1.3; }
+.folio-main { padding: 16px 18px 18px; display: grid; gap: 10px; min-width: 0; }
+.folio-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.folio-top strong { display: block; margin-top: 4px; font-size: 1.05rem; letter-spacing: -0.03em; }
+.folio-amount {
+  font-family: Manrope, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+.book-cards { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 12px; }
+.book-card {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+}
+.book-card header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.book-card header > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.book-card strong { letter-spacing: -0.03em; }
+.book-card header b { font-family: Manrope, sans-serif; font-size: 1.35rem; letter-spacing: -0.04em; white-space: nowrap; }
+.book-meta { margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+.book-progress { display: grid; gap: 8px; margin-top: 4px; }
+.book-progress-top, .book-progress-foot { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.book-progress-top span, .book-progress-foot span { color: var(--muted); font-size: 0.75rem; font-weight: 700; }
+.book-progress-top em { font-style: normal; font-family: Manrope, sans-serif; font-weight: 800; letter-spacing: -0.04em; }
+.book-progress .meter { height: 8px; }
+.book-pay { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.book-pay input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 0;
+}
+.book-pay input:focus { outline: none; border-bottom-color: var(--ink); }
+.book-sheet { margin-top: 12px; }
+.expense-card .linkish { justify-self: start; }
+.loan-estimate {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 64px;
+}
+.loan-estimate span { color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+.loan-estimate strong {
+  font-family: Manrope, sans-serif;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.loan-pick {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: min(42vh, 360px);
+  overflow: auto;
+}
+.loan-pick li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border-radius: 18px;
+  background: var(--soft);
+  padding: 4px;
+}
+.loan-pick li.on { background: #efe8df; }
+.loan-pick-hit {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  padding: 6px 8px;
+  border-radius: 14px;
+  color: inherit;
+}
+.loan-pick-hit:disabled { opacity: 0.42; cursor: not-allowed; }
+.loan-pick-hit strong { display: block; letter-spacing: -0.03em; }
+.loan-pick-hit small { color: var(--muted); }
+.loan-pick-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline-end: 6px;
+}
+.loan-pick-tools input {
+  width: 48px;
+  min-height: 34px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+  padding: 4px 0;
+}
+.loan-pick-tools input:focus { outline: none; border-bottom-color: var(--ink); }
 .meter { height: 8px; background: var(--soft); border-radius: 999px; overflow: hidden; }
 .meter span { display: block; height: 100%; background: var(--ink); border-radius: inherit; }
 .back-pill {
@@ -1488,8 +1691,10 @@ table.data tbody tr:hover { background: #f7f3ec; }
   .command-launch { order: 3; flex-basis: 100%; max-width: none; }
   .topbar { flex-wrap: wrap; position: sticky; top: 0; z-index: 15; background: var(--bg); padding-bottom: 8px; }
   .page-head { flex-direction: column; align-items: stretch; }
-  .board-grid, .grid-2, .grid-3, .line-editor, .split-sum, .accounts, .arrivage-list, .charge-create, .charge-ledger, .charge-progress, .charge-work { grid-template-columns: 1fr; }
-  .arrivage-card, .arrivage-card:has(.arrivage-faces) { grid-template-columns: 88px minmax(0, 1fr); }
+  .board-grid, .grid-2, .grid-3, .line-editor, .split-sum, .accounts, .arrivage-list, .charge-create, .charge-ledger, .charge-progress, .charge-work, .folio-card { grid-template-columns: 1fr; }
+  .line-editor li { grid-template-columns: 1fr 1fr; }
+  .line-editor li label:first-child { grid-column: 1 / -1; }
+  .arrivage-open, .arrivage-open:has(.arrivage-faces) { grid-template-columns: 88px minmax(0, 1fr); }
   .arrivage-faces { display: none; }
   .arrivage-mark { padding: 12px; }
   .arrivage-mark b { font-size: 2.5rem; }

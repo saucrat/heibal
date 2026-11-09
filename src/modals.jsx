@@ -119,7 +119,6 @@ export function ProductModal({ initial, start = 'fiche', onClose, onDelete }) {
     if (!form.nameFr.trim()) missing.push('nameFr');
     if (!form.nameAr.trim()) missing.push('nameAr');
     if (!form.brand.trim()) missing.push('brand');
-    if (!form.ref.trim()) missing.push('ref');
     if (!(Number(form.volumeMl) > 0)) missing.push('volumeMl');
     if (!(parseMoney(form.sellPrice) > 0)) missing.push('sellPrice');
     if (!(parseMoney(form.buyPrice) > 0)) missing.push('buyPrice');
@@ -243,9 +242,6 @@ export function ProductModal({ initial, start = 'fiche', onClose, onDelete }) {
             <Field label={t('brand')} invalid={gaps.includes('brand')}>
               <input value={form.brand} onChange={(event) => set('brand', event.target.value)} placeholder={t('brand_ph')} required />
             </Field>
-            <Field label={t('reference')} invalid={gaps.includes('ref')}>
-              <input value={form.ref} onChange={(event) => set('ref', event.target.value)} placeholder={t('ref_ph')} dir="ltr" required />
-            </Field>
           </div>
           <Field label={t('concentration')}>
             <Choice
@@ -345,58 +341,139 @@ export function RestockModal({ product, onClose }) {
   );
 }
 
-export function SettingsModal({ onClose }) {
-  const { t, currency, setCurrency, exportData, importData, resetData } = useStore();
-  const [armed, setArmed] = useState(false);
-  const codes = ['MRU', 'EUR', 'MAD', 'TND', 'DA'];
+function PinModal({ title, body, confirmLabel, danger = false, onClose, onConfirm, onSuccess }) {
+  const { t } = useStore();
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    const result = await onConfirm(pin);
+    setBusy(false);
+    if (result?.error === 'bad_pin' || result?.error === 'forbidden') {
+      setPinError(true);
+      return;
+    }
+    if (!result?.error) {
+      onClose();
+      onSuccess?.();
+    }
+  }
 
   return (
-    <Modal title={t('settings')} onClose={onClose} closeLabel={t('close')}>
-      <div className="stack">
-        <p className="hint">{t('settings_lead')}</p>
-        <Field label={t('currency')} hint={t('currency_note')}>
-          <Choice
-            value={currency}
-            onValueChange={setCurrency}
-            ariaLabel={t('currency')}
-            options={codes.map((code) => ({ value: code, label: code }))}
+    <Modal title={title} onClose={onClose} closeLabel={t('close')}>
+      <form className="stack" onSubmit={submit}>
+        <p className="confirm-text">{body}</p>
+        <Field label={t('delete_pin')} invalid={pinError}>
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(event) => { setPin(event.target.value); setPinError(false); }}
+            placeholder="••••••"
+            autoComplete="off"
+            autoFocus
+            required
           />
         </Field>
-        <section className="setting-block">
-          <h3>{t('backup')}</h3>
-          <p className="hint">{t('export_lead')}</p>
-          <button type="button" className="btn btn-ghost" onClick={exportData}>{t('export')}</button>
-          <p className="hint">{t('import_lead')}</p>
-          <label className="btn btn-ghost file-btn">
-            {t('import')}
-            <input
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) importData(file);
-                event.target.value = '';
-              }}
-            />
-          </label>
-        </section>
-        <section className="setting-block danger-block">
-          <h3>{t('danger_zone')}</h3>
-          <p className="hint">{t('reset_lead')}</p>
-          {armed ? (
-            <>
-              <p className="confirm-text">{t('reset_confirm')}</p>
-              <div className="page-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setArmed(false)}>{t('cancel')}</button>
-                <button type="button" className="btn btn-danger" onClick={() => { resetData(); onClose(); }}>{t('yes_reset')}</button>
-              </div>
-            </>
-          ) : (
-            <button type="button" className="btn btn-danger" onClick={() => setArmed(true)}>{t('reset')}</button>
-          )}
-        </section>
-      </div>
+        {pinError ? <p className="warn">{t('bad_pin')}</p> : null}
+        <div className="modal-actions">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>{t('cancel')}</button>
+          <button type="submit" className={`btn ${danger ? 'btn-danger' : 'btn-gold'}`} disabled={!pin.trim() || busy}>{confirmLabel}</button>
+        </div>
+      </form>
     </Modal>
+  );
+}
+
+export function SettingsModal({ onClose }) {
+  const { t, currency, setCurrency, exportData, importData, resetData, confirmPin } = useStore();
+  const [gate, setGate] = useState(null);
+  const [file, setFile] = useState(null);
+  const codes = ['MRU', 'EUR', 'MAD', 'TND', 'DA'];
+
+  function closeGate() {
+    setGate(null);
+    setFile(null);
+  }
+
+  return (
+    <>
+      <Modal title={t('settings')} onClose={onClose} closeLabel={t('close')}>
+        <div className="stack">
+          <p className="hint">{t('settings_lead')}</p>
+          <Field label={t('currency')} hint={t('currency_note')}>
+            <Choice
+              value={currency}
+              onValueChange={setCurrency}
+              ariaLabel={t('currency')}
+              options={codes.map((code) => ({ value: code, label: code }))}
+            />
+          </Field>
+          <section className="setting-block">
+            <h3>{t('backup')}</h3>
+            <p className="hint">{t('export_lead')}</p>
+            <button type="button" className="btn btn-ghost" onClick={() => setGate('export')}>{t('export')}</button>
+            <p className="hint">{t('import_lead')}</p>
+            <label className="btn btn-ghost file-btn">
+              {t('import')}
+              <input
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(event) => {
+                  const next = event.target.files?.[0];
+                  if (next) {
+                    setFile(next);
+                    setGate('import');
+                  }
+                  event.target.value = '';
+                }}
+              />
+            </label>
+          </section>
+          <section className="setting-block danger-block">
+            <h3>{t('danger_zone')}</h3>
+            <p className="hint">{t('reset_lead')}</p>
+            <button type="button" className="btn btn-danger" onClick={() => setGate('reset')}>{t('reset')}</button>
+          </section>
+        </div>
+      </Modal>
+      {gate === 'export' ? (
+        <PinModal
+          title={t('export')}
+          body={t('pin_export')}
+          confirmLabel={t('export')}
+          onClose={closeGate}
+          onConfirm={async (pin) => {
+            const result = await confirmPin(pin);
+            if (!result?.error && result?.ok) exportData();
+            return result?.ok ? { ok: true } : result;
+          }}
+        />
+      ) : null}
+      {gate === 'import' && file ? (
+        <PinModal
+          title={t('import')}
+          body={t('pin_import')}
+          confirmLabel={t('import')}
+          onClose={closeGate}
+          onConfirm={(pin) => importData(file, pin)}
+        />
+      ) : null}
+      {gate === 'reset' ? (
+        <PinModal
+          title={t('reset')}
+          body={t('reset_confirm')}
+          confirmLabel={t('yes_reset')}
+          danger
+          onClose={closeGate}
+          onSuccess={onClose}
+          onConfirm={(pin) => resetData(pin)}
+        />
+      ) : null}
+    </>
   );
 }

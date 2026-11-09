@@ -6,6 +6,8 @@ import { connect, db, dbName } from './db.js';
 import {
   addShipmentPerfume,
   importLedger,
+  removeShipment,
+  updateShipment,
   payLoan,
   readLedger,
   refund,
@@ -24,7 +26,6 @@ import {
 
 const port = Number(process.env.PORT) || 4000;
 const host = process.env.HOST || '0.0.0.0';
-const production = process.env.NODE_ENV === 'production';
 const origins = String(process.env.CORS_ORIGIN || 'http://127.0.0.1:5173,http://localhost:5173')
   .split(',')
   .map((item) => item.trim())
@@ -47,9 +48,11 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '2mb' }));
 
-function allowDangerous(_req, res, next) {
-  if (production && process.env.ALLOW_DANGEROUS !== '1') {
-    res.status(403).json({ error: 'forbidden' });
+const DELETE_PIN = '050821';
+
+function allowReset(req, res, next) {
+  if (String(req.body?.pin || '') !== DELETE_PIN) {
+    res.status(403).json({ error: 'bad_pin' });
     return;
   }
   next();
@@ -166,11 +169,14 @@ app.post('/api/writeoffs', (req, res) => handle(res, () => writeoff(req.body)));
 app.post('/api/expenses', (req, res) => handle(res, () => saveExpense(req.body)));
 app.delete('/api/expenses/:id', (req, res) => handle(res, () => removeExpense(req.params.id)));
 app.post('/api/shipments', (req, res) => handle(res, () => saveShipment(req.body)));
+app.put('/api/shipments/:id', (req, res) => handle(res, () => updateShipment({ ...req.body, id: req.params.id })));
+app.delete('/api/shipments/:id', (req, res) => handle(res, () => removeShipment(req.params.id)));
 app.post('/api/shipments/:id/perfumes', (req, res) => handle(res, () => addShipmentPerfume({ ...req.body, shipmentId: req.params.id })));
 app.post('/api/loans', (req, res) => handle(res, () => saveLoan(req.body)));
 app.post('/api/loans/:id/payments', (req, res) => handle(res, () => payLoan({ ...req.body, loanId: req.params.id })));
-app.post('/api/import', allowDangerous, (req, res) => handle(res, () => importLedger(req.body)));
-app.post('/api/reset', allowDangerous, (req, res) => handle(res, () => resetLedger(req.body)));
+app.post('/api/pin', allowReset, (_req, res) => res.json({ ok: true }));
+app.post('/api/import', allowReset, (req, res) => handle(res, () => importLedger(req.body)));
+app.post('/api/reset', allowReset, (req, res) => handle(res, () => resetLedger(req.body)));
 
 let database;
 try {

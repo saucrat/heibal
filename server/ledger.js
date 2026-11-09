@@ -2,6 +2,7 @@ import { db } from './db.js';
 import {
   applyAddPerfume,
   applyDelete,
+  applyDeleteShipment,
   applyExpense,
   applyDeleteExpense,
   applyLoan,
@@ -11,6 +12,7 @@ import {
   applyRestock,
   applySale,
   applyShipment,
+  applyUpdateShipment,
   applyWriteoff,
   initialState,
   sanitize,
@@ -118,6 +120,14 @@ export function removeExpense(id) {
 
 export function saveShipment(input) {
   return mutate((state) => applyShipment(state, input || {}));
+}
+
+export function updateShipment(input) {
+  return mutate((state) => applyUpdateShipment(state, input || {}));
+}
+
+export function removeShipment(id) {
+  return mutate((state) => applyDeleteShipment(state, id));
 }
 
 export function addShipmentPerfume(input) {

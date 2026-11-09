@@ -213,10 +213,10 @@ function productFields(input, currency) {
   const nameFr = String(input.nameFr || '').trim().slice(0, 80);
   const nameAr = String(input.nameAr || '').trim().slice(0, 80);
   const brand = String(input.brand || '').trim().slice(0, 60);
-  const ref = String(input.ref || '').trim().slice(0, 40);
+  const ref = String(input.ref || '').trim().slice(0, 40) || `A-${uid().slice(0, 6).toUpperCase()}`;
   const image = cleanImage(input.image);
   if (!nameFr || !nameAr) return { error: 'required_name' };
-  if (!brand || !ref || !image) return { error: 'required_fields' };
+  if (!brand || !image) return { error: 'required_fields' };
 
   const sellPrice = roundMoney(parseMoney(input.sellPrice), currency);
   const buyPrice = roundMoney(parseMoney(input.buyPrice), currency);
@@ -818,6 +818,40 @@ export function applyShipment(state, input) {
     createdAt: new Date().toISOString(),
   };
   return { state: { ...state, products, restocks, shipments: [shipment, ...(state.shipments || [])] } };
+}
+
+export function applyUpdateShipment(state, input) {
+  const currency = currencyOf(state);
+  const shipments = cloneShipments(state.shipments);
+  const shipment = shipments.find((row) => row.id === input.id);
+  if (!shipment) return { error: 'product_required' };
+  const total = roundMoney(parseMoney(input.total), currency);
+  if (!(total > 0)) return { error: 'bad_price' };
+  const arrivedAt = parseWhen(input.arrivedAt);
+  if (!arrivedAt) return { error: 'required_fields' };
+  shipment.total = total;
+  shipment.arrivedAt = arrivedAt.toISOString();
+  shipment.perfumeCost = roundMoney(shipment.lines.reduce((sum, line) => sum + Number(line.unitCost) * Number(line.qty), 0), currency);
+  shipment.extraCost = roundMoney(shipment.total - shipment.perfumeCost, currency);
+  if (input.note !== undefined) shipment.note = String(input.note || '').trim().slice(0, 200);
+  return { state: { ...state, shipments } };
+}
+
+export function applyDeleteShipment(state, id) {
+  if (!id) return { error: 'product_required' };
+  const shipment = (state.shipments || []).find((row) => row.id === id);
+  if (!shipment) return { error: 'product_required' };
+  let next = state;
+  for (const line of shipment.lines || []) {
+    const result = applyDelete(next, line.productId);
+    if (!result.error) next = result.state;
+  }
+  return {
+    state: {
+      ...next,
+      shipments: (next.shipments || []).filter((row) => row.id !== id),
+    },
+  };
 }
 
 export function applyAddPerfume(state, input) {

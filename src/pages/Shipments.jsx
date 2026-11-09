@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { assetUrl } from '../api.js';
 import { displayName, formatDate, secondaryName } from '../format.js';
 import { arrivageReport } from '../logic.js';
+import { EmptyState } from '../empty.jsx';
 import { PhotoField, ProductModal, productToForm } from '../modals.jsx';
 import { useStore } from '../store.jsx';
 import { Choice, Confirm, Field } from '../ui.jsx';
@@ -61,7 +62,10 @@ function leftText(line) {
 }
 
 export function Shipments() {
-  const { t, lang, products, shipments, money, saveShipment, addShipmentPerfume, removeProduct, currency } = useStore();
+  const {
+    t, lang, products, shipments, money, saveShipment, updateShipment, removeShipment,
+    addShipmentPerfume, removeProduct, currency,
+  } = useStore();
   const [view, setView] = useState('list');
   const [openId, setOpenId] = useState('');
   const [total, setTotal] = useState('');
@@ -69,11 +73,19 @@ export function Shipments() {
   const [perfume, setPerfume] = useState(blankPerfume);
   const [sheet, setSheet] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [pendingCharge, setPendingCharge] = useState(null);
   const rows = [...(shipments || [])].sort((a, b) => String(b.arrivedAt).localeCompare(String(a.arrivedAt)));
   const open = rows.find((row) => row.id === openId) || (shipments || []).find((row) => row.id === openId);
 
   function setField(key, value) {
     setPerfume((current) => ({ ...current, [key]: value }));
+  }
+
+  function openEdit(row) {
+    setOpenId(row.id);
+    setTotal(String(row.total || ''));
+    setArrivedAt(String(row.arrivedAt || '').slice(0, 10) || todayInput());
+    setView('edit');
   }
 
   async function submit(event) {
@@ -87,6 +99,15 @@ export function Shipments() {
         setOpenId(created.id);
         setView('detail');
       } else setView('list');
+    }
+  }
+
+  async function submitEdit(event) {
+    event.preventDefault();
+    if (!openId) return;
+    const result = await updateShipment(openId, { total, arrivedAt });
+    if (!result?.error) {
+      setView('detail');
     }
   }
 
@@ -141,7 +162,7 @@ export function Shipments() {
         <section className="charge-work">
           <section className="charge-catalog">
             <h2>{t('perfumes_in')}</h2>
-            {report.lines.length === 0 ? <p className="charge-empty">{t('charge_empty')}</p> : (
+            {report.lines.length === 0 ? <EmptyState kind="bottle" text={t('charge_empty')} compact /> : (
               <ul className="charge-cards">
                 {report.lines.map((line, index) => {
                   const product = products.find((item) => item.id === line.productId);
@@ -188,9 +209,6 @@ export function Shipments() {
               </Field>
               <Field label={t('brand')}>
                 <input value={perfume.brand} onChange={(event) => setField('brand', event.target.value)} required />
-              </Field>
-              <Field label={t('reference')}>
-                <input value={perfume.ref} onChange={(event) => setField('ref', event.target.value)} dir="ltr" />
               </Field>
             </div>
             <Field label={t('concentration')}>
@@ -264,14 +282,14 @@ export function Shipments() {
     );
   }
 
-  if (view === 'new') {
+  if (view === 'new' || (view === 'edit' && openId)) {
     return (
       <>
         <section className="charge-create">
-          <form className="charge-sheet" onSubmit={submit}>
-            <button type="button" className="back-pill" onClick={() => setView('list')}>{t('back_stock')}</button>
+          <form className="charge-sheet" onSubmit={view === 'edit' ? submitEdit : submit}>
+            <button type="button" className="back-pill" onClick={() => setView(view === 'edit' ? 'detail' : 'list')}>{t('back_stock')}</button>
             <p className="eyebrow">{t('nav_shipments')}</p>
-            <h1>{t('new_arrivage')}</h1>
+            <h1>{view === 'edit' ? t('edit_charge') : t('new_arrivage')}</h1>
             <label className="charge-amount">
               <span>{t('invested')}</span>
               <div>
@@ -301,9 +319,16 @@ export function Shipments() {
           <h1>{t('stock_title')}</h1>
           <p className="hint">{t('stock_lead')}</p>
         </div>
-        <button type="button" className="btn btn-gold" onClick={() => setView('new')}>{t('new_arrivage')}</button>
+        <button type="button" className="btn btn-gold" onClick={() => { setTotal(''); setArrivedAt(todayInput()); setView('new'); }}>{t('new_arrivage')}</button>
       </header>
-      {rows.length === 0 ? <p className="hint">{t('no_shipments')}</p> : (
+      {rows.length === 0 ? (
+        <EmptyState
+          kind="crate"
+          title={t('no_shipments')}
+          text={t('stock_lead')}
+          action={<button type="button" className="btn btn-gold" onClick={() => { setTotal(''); setArrivedAt(todayInput()); setView('new'); }}>{t('new_arrivage')}</button>}
+        />
+      ) : (
         <ul className="arrivage-list">
           {rows.map((row) => {
             const report = arrivageReport(row, products, currency);
@@ -311,8 +336,8 @@ export function Shipments() {
             const month = formatDate(row.arrivedAt, lang, { month: 'long', year: 'numeric' });
             const faces = report.lines.filter((line) => line.image).slice(0, 4);
             return (
-              <li key={row.id}>
-                <button type="button" className="arrivage-card" onClick={() => { setOpenId(row.id); setView('detail'); }}>
+              <li key={row.id} className="arrivage-card">
+                <button type="button" className="arrivage-open" onClick={() => { setOpenId(row.id); setView('detail'); }}>
                   <span className="arrivage-mark">
                     <b>{day}</b>
                     <small>{month}</small>
@@ -335,11 +360,34 @@ export function Shipments() {
                     </span>
                   ) : null}
                 </button>
+                <div className="arrivage-actions">
+                  <button type="button" onClick={() => openEdit(row)}>{t('edit')}</button>
+                  <button type="button" className="danger" onClick={() => setPendingCharge(row)}>{t('delete')}</button>
+                </div>
               </li>
             );
           })}
         </ul>
       )}
+      {pendingCharge ? (
+        <Confirm
+          title={t('delete')}
+          body={t('confirm_delete_charge')}
+          confirmLabel={t('yes_delete')}
+          closeLabel={t('cancel')}
+          danger
+          onClose={() => setPendingCharge(null)}
+          onConfirm={async () => {
+            const id = pendingCharge.id;
+            setPendingCharge(null);
+            await removeShipment(id);
+            if (openId === id) {
+              setOpenId('');
+              setView('list');
+            }
+          }}
+        />
+      ) : null}
     </>
   );
 }

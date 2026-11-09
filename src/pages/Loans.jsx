@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { assetUrl } from '../api.js';
 import { displayName, formatDate, saleLineName } from '../format.js';
-import { canPortion, dueReminders, loanOutstanding } from '../logic.js';
+import { canPortion, loanCollected, loanOutstanding, portionPrice } from '../logic.js';
 import { useStore } from '../store.jsx';
-import { Field } from '../ui.jsx';
+import { EmptyState } from '../empty.jsx';
+import { Field, Modal } from '../ui.jsx';
 
 function todayInput() {
   const now = new Date();
@@ -11,38 +13,92 @@ function todayInput() {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
-const blankLine = { productId: '', qty: '1', unit: 'bottle' };
+function percent(ratio) {
+  const value = Math.round((Number(ratio) || 0) * 1000) / 10;
+  return `${value}%`;
+}
+
+function Track({ ratio }) {
+  const width = Math.max(0, Math.min(100, (Number(ratio) || 0) * 100));
+  return (
+    <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(width)}>
+      <span style={{ width: `${width}%` }} />
+    </div>
+  );
+}
+
+function lineKey(productId, unit) {
+  return `${productId}:${unit || 'bottle'}`;
+}
 
 export function Loans() {
-  const { t, lang, products, loans, money, saveLoan, payLoan } = useStore();
+  const { t, lang, products, loans, money, currency, saveLoan, payLoan } = useStore();
+  const [creating, setCreating] = useState(false);
   const [client, setClient] = useState('');
   const [contact, setContact] = useState('');
   const [dueAt, setDueAt] = useState(todayInput);
-  const [total, setTotal] = useState('');
-  const [lines, setLines] = useState([{ ...blankLine }]);
+  const [picked, setPicked] = useState({});
   const [pay, setPay] = useState({});
   const rows = loans || [];
-  const reminders = dueReminders(rows);
+  const inStock = useMemo(
+    () => [...(products || [])].filter((item) => item.stock > 0 || (canPortion(item) && (item.openMl || []).some((ml) => ml >= 10))),
+    [products],
+  );
 
-  function setLine(index, key, value) {
-    setLines((current) => current.map((line, i) => (i === index ? { ...line, [key]: value } : line)));
+  const lines = useMemo(
+    () => Object.entries(picked)
+      .map(([key, qty]) => {
+        const [productId, unit] = key.split(':');
+        return { productId, unit, qty };
+      })
+      .filter((line) => line.qty > 0),
+    [picked],
+  );
+
+  const estimate = useMemo(() => lines.reduce((sum, line) => {
+    const product = products.find((item) => item.id === line.productId);
+    if (!product) return sum;
+    const price = line.unit === 'portion' ? portionPrice(product, currency) : Number(product.sellPrice) || 0;
+    return sum + price * line.qty;
+  }, 0), [lines, products, currency]);
+
+  function pick(product, unit = 'bottle') {
+    const key = lineKey(product.id, unit);
+    setPicked((current) => ({ ...current, [key]: (current[key] || 0) + 1 }));
+  }
+
+  function setQty(productId, unit, qty) {
+    const key = lineKey(productId, unit);
+    const next = Math.max(0, Math.floor(Number(qty) || 0));
+    setPicked((current) => {
+      if (next < 1) {
+        const copy = { ...current };
+        delete copy[key];
+        return copy;
+      }
+      return { ...current, [key]: next };
+    });
+  }
+
+  function resetForm() {
+    setClient('');
+    setContact('');
+    setDueAt(todayInput());
+    setPicked({});
   }
 
   async function submit(event) {
     event.preventDefault();
+    if (lines.length === 0) return;
     const result = await saveLoan({
       client,
       contact,
       dueAt,
-      total,
-      lines: lines.filter((line) => line.productId),
+      lines,
     });
     if (!result?.error) {
-      setClient('');
-      setContact('');
-      setTotal('');
-      setLines([{ ...blankLine }]);
-      setDueAt(todayInput());
+      resetForm();
+      setCreating(false);
     }
   }
 
@@ -60,113 +116,174 @@ export function Loans() {
           <h1>{t('loans_title')}</h1>
           <p className="hint">{t('loans_lead')}</p>
         </div>
-        <p className="eyebrow">{t('outstanding')} <strong dir="ltr">{money(loanOutstanding(rows))}</strong></p>
-      </header>
-      {reminders.length > 0 ? (
-        <ul className="reminders">
-          {reminders.map((loan) => (
-            <li key={loan.id}>
-              <strong>{loan.client}</strong>
-              <span>{t('reminder_left', { n: money(loan.total - loan.paid) })}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <form className="panel book-form" onSubmit={submit}>
-        <div className="grid-2">
-          <Field label={t('client')}>
-            <input value={client} onChange={(event) => setClient(event.target.value)} placeholder={t('client_ph')} required />
-          </Field>
-          <Field label={t('contact')}>
-            <input value={contact} onChange={(event) => setContact(event.target.value)} placeholder={t('contact_ph')} dir="ltr" />
-          </Field>
-          <Field label={t('due_on')}>
-            <input type="date" value={dueAt} onChange={(event) => setDueAt(event.target.value)} required />
-          </Field>
-          <Field label={t('amount_owed')} hint={t('owed_hint')}>
-            <input inputMode="decimal" value={total} onChange={(event) => setTotal(event.target.value)} />
-          </Field>
+        <div className="page-actions">
+          <button type="button" className="btn btn-gold" onClick={() => setCreating(true)}>{t('new_loan')}</button>
         </div>
-        <ul className="line-editor">
-          {lines.map((line, index) => {
-            const product = products.find((item) => item.id === line.productId);
-            return (
-              <li key={index}>
-                <label>
-                  <span>{t('add_line')}</span>
-                  <select value={line.productId} onChange={(event) => setLine(index, 'productId', event.target.value)} required>
-                    <option value="">{t('add_line')}</option>
-                    {products.map((item) => (
-                      <option key={item.id} value={item.id}>{displayName(item, lang)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>{t('qty')}</span>
-                  <input inputMode="numeric" value={line.qty} onChange={(event) => setLine(index, 'qty', event.target.value)} required />
-                </label>
-                <label>
-                  <span>{t('serve_as')}</span>
-                  <select value={line.unit} onChange={(event) => setLine(index, 'unit', event.target.value)}>
-                    <option value="bottle">{t('bottle_unit')}</option>
-                    {product && canPortion(product) ? <option value="portion">{t('portion')}</option> : null}
-                  </select>
-                </label>
-                {lines.length > 1 ? (
-                  <button type="button" className="linkish" onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>{t('delete')}</button>
-                ) : <span />}
-              </li>
-            );
-          })}
-        </ul>
-        <button type="button" className="btn btn-ghost" onClick={() => setLines((current) => [...current, { ...blankLine }])}>{t('add_line')}</button>
-        <button type="submit" className="btn btn-gold">{t('save_loan')}</button>
-      </form>
-      {rows.length === 0 ? <p className="hint">{t('no_loans')}</p> : (
-        <ul className="money-list">
-          {rows.map((loan) => {
-            const left = Math.max(0, loan.total - loan.paid);
-            const label = loan.status === 'paid' ? 'settled' : loan.status === 'partial' ? 'partial' : 'pending';
-            return (
-              <li key={loan.id} className="loan-row">
-                <div>
-                  <strong>{loan.client}</strong>
-                  <small>
-                    {loan.items.map((item) => saleLineName(item, lang)).join(' · ')}
-                    {loan.contact ? ` · ${loan.contact}` : ''}
-                  </small>
-                  <small>
-                    {t('due_on')} {formatDate(loan.dueAt, lang, { day: 'numeric', month: 'short', year: 'numeric' })}
-                    {' · '}
-                    {t('remind_on')} {formatDate(loan.remindAt, lang, { day: 'numeric', month: 'short' })}
-                  </small>
-                  {loan.payments?.length ? (
-                    <small>
-                      {loan.payments.map((pay) => `${formatDate(pay.at, lang, { day: 'numeric', month: 'short' })} ${money(pay.amount)}`).join(' · ')}
-                    </small>
-                  ) : null}
-                </div>
-                <div className="loan-pay">
-                  <b dir="ltr">{money(left)}</b>
-                  <em className={`status-pill ${loan.status}`}>{t(label)}</em>
-                  {loan.status !== 'paid' ? (
-                    <form onSubmit={(event) => { event.preventDefault(); collect(loan); }}>
-                      <input
-                        inputMode="decimal"
-                        value={pay[loan.id] || ''}
-                        onChange={(event) => setPay((current) => ({ ...current, [loan.id]: event.target.value }))}
-                        placeholder={t('amount')}
-                        aria-label={t('record_payment')}
-                      />
-                      <button type="submit" className="btn btn-gold btn-sm">{t('record_payment')}</button>
-                    </form>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      </header>
+
+      {creating ? (
+        <Modal title={t('new_loan')} onClose={() => { setCreating(false); resetForm(); }} closeLabel={t('close')} wide>
+          <form className="stack" onSubmit={submit}>
+            <div className="grid-2">
+              <Field label={t('client')}>
+                <input value={client} onChange={(event) => setClient(event.target.value)} placeholder={t('client_ph')} required />
+              </Field>
+              <Field label={t('contact')}>
+                <input value={contact} onChange={(event) => setContact(event.target.value)} placeholder={t('contact_ph')} dir="ltr" />
+              </Field>
+              <Field label={t('due_on')}>
+                <input type="date" value={dueAt} onChange={(event) => setDueAt(event.target.value)} required />
+              </Field>
+              <div className="loan-estimate">
+                <span>{t('amount_owed')}</span>
+                <strong dir="ltr">{money(estimate)}</strong>
+              </div>
+            </div>
+
+            <p className="hint">{t('loan_pick')}</p>
+            {inStock.length === 0 ? (
+              <p className="hint">{t('empty_sale_text')}</p>
+            ) : (
+              <ul className="loan-pick">
+                {inStock.map((product) => {
+                  const bottles = picked[lineKey(product.id, 'bottle')] || 0;
+                  const portions = picked[lineKey(product.id, 'portion')] || 0;
+                  const selected = bottles > 0 || portions > 0;
+                  return (
+                    <li key={product.id} className={selected ? 'on' : ''}>
+                      <button
+                        type="button"
+                        className="loan-pick-hit"
+                        disabled={product.stock < 1}
+                        onClick={() => pick(product, 'bottle')}
+                      >
+                        <span className="shelf-photo">
+                          {product.image ? <img src={assetUrl(product.image)} alt="" /> : null}
+                        </span>
+                        <span>
+                          {product.brand ? <small className="p-brand">{product.brand}</small> : null}
+                          <strong><bdi>{displayName(product, lang)}</bdi></strong>
+                          <small dir="ltr">{money(product.sellPrice)}</small>
+                        </span>
+                        {bottles > 0 ? <b className="qty-badge">{bottles}</b> : null}
+                      </button>
+                      <div className="loan-pick-tools">
+                        {bottles > 0 ? (
+                          <label>
+                            <span className="sr">{t('qty')}</span>
+                            <input
+                              inputMode="numeric"
+                              value={bottles}
+                              onChange={(event) => setQty(product.id, 'bottle', event.target.value)}
+                            />
+                          </label>
+                        ) : null}
+                        {canPortion(product) && portionPrice(product, currency) > 0 ? (
+                          <button type="button" className="shelf-part" onClick={() => pick(product, 'portion')}>
+                            {t('portion')}
+                            {portions > 0 ? <b className="qty-badge">{portions}</b> : null}
+                          </button>
+                        ) : null}
+                        {portions > 0 ? (
+                          <label>
+                            <span className="sr">{t('qty')}</span>
+                            <input
+                              inputMode="numeric"
+                              value={portions}
+                              onChange={(event) => setQty(product.id, 'portion', event.target.value)}
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => { setCreating(false); resetForm(); }}>{t('cancel')}</button>
+              <button type="submit" className="btn btn-gold" disabled={lines.length === 0}>{t('save_loan')}</button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      <section className="folio">
+        <article className="folio-hero">
+          <p className="eyebrow">{t('outstanding')}</p>
+          <p className="folio-num" dir="ltr">{money(loanOutstanding(rows))}</p>
+          <p className="folio-sub">{t('collected')} · <bdi dir="ltr">{money(loanCollected(rows))}</bdi></p>
+        </article>
+        {rows.length === 0 ? (
+          <EmptyState
+            kind="loan"
+            title={t('no_loans')}
+            text={t('loans_lead')}
+            action={<button type="button" className="btn btn-gold" onClick={() => setCreating(true)}>{t('new_loan')}</button>}
+          />
+        ) : (
+          <ul className="folio-list">
+            {rows.map((loan) => {
+              const left = Math.max(0, Number(loan.total) - Number(loan.paid));
+              const ratio = Number(loan.total) > 0 ? Number(loan.paid) / Number(loan.total) : 0;
+              const label = loan.status === 'paid' ? 'settled' : loan.status === 'partial' ? 'partial' : 'pending';
+              const day = formatDate(loan.dueAt, lang, { day: 'numeric' });
+              const month = formatDate(loan.dueAt, lang, { month: 'short' });
+              return (
+                <li key={loan.id} className="folio-card">
+                  <div className="folio-mark">
+                    <b>{day}</b>
+                    <small>{month}</small>
+                  </div>
+                  <div className="folio-main">
+                    <div className="folio-top">
+                      <div>
+                        <em className={`status-pill ${loan.status}`}>{t(label)}</em>
+                        <strong>{loan.client}</strong>
+                        <p className="book-meta">
+                          {loan.items.map((item) => saleLineName(item, lang)).join(' · ')}
+                          {loan.contact ? ` · ${loan.contact}` : ''}
+                        </p>
+                      </div>
+                      <b className="folio-amount" dir="ltr">{money(left)}</b>
+                    </div>
+                    <div className="book-progress">
+                      <div className="book-progress-top">
+                        <span>{t('loan_progress')}</span>
+                        <em dir="ltr">{percent(ratio)}</em>
+                      </div>
+                      <Track ratio={ratio} />
+                      <div className="book-progress-foot">
+                        <span>{t('paid_of')} <bdi dir="ltr">{money(loan.paid)}</bdi></span>
+                        <span>{t('amount_owed')} <bdi dir="ltr">{money(loan.total)}</bdi></span>
+                      </div>
+                    </div>
+                    {loan.payments?.length ? (
+                      <p className="book-meta">
+                        {loan.payments.map((entry) => `${formatDate(entry.at, lang, { day: 'numeric', month: 'short' })} ${money(entry.amount)}`).join(' · ')}
+                      </p>
+                    ) : null}
+                    {loan.status !== 'paid' ? (
+                      <form className="book-pay" onSubmit={(event) => { event.preventDefault(); collect(loan); }}>
+                        <input
+                          inputMode="decimal"
+                          value={pay[loan.id] || ''}
+                          onChange={(event) => setPay((current) => ({ ...current, [loan.id]: event.target.value }))}
+                          placeholder={t('amount')}
+                          aria-label={t('record_payment')}
+                          required
+                        />
+                        <button type="submit" className="btn btn-gold btn-sm">{t('record_payment')}</button>
+                      </form>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </>
   );
 }

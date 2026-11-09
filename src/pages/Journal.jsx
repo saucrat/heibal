@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { EmptyState } from '../empty.jsx';
 import { dayKey, displayName, formatDate, formatTime, saleLineName } from '../format.js';
 import { useStore } from '../store.jsx';
 import { Choice, PerfumePhotos } from '../ui.jsx';
@@ -116,7 +117,12 @@ export function Journal() {
         />
       </div>
 
-      {visible.length === 0 ? <section className="empty compact"><p>{t('no_journal')}</p></section> : (
+      {visible.length === 0 ? (
+        <EmptyState
+          kind={query || filter !== 'all' ? 'search' : 'journal'}
+          title={t('no_journal')}
+        />
+      ) : (
         <div className="book">
           {groups.map((group) => (
             <section key={group.key} className="book-day">

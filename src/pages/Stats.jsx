@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { assetUrl } from '../api.js';
+import { EmptyState } from '../empty.jsx';
 import {
   dayKey,
   displayName,
@@ -200,7 +201,7 @@ export function Stats() {
       <section className="stats-split">
         <article className="panel">
           <div className="panel-head"><h2>{t('top_products')}</h2></div>
-          {view.top.length === 0 ? <p className="hint">{t('top_empty')}</p> : (
+          {view.top.length === 0 ? <EmptyState kind="rank" text={t('top_empty')} compact /> : (
             <ol className="rank">
               {view.top.map((row, index) => (
                 <li key={`${row.name}-${index}`}>
@@ -219,7 +220,7 @@ export function Stats() {
         </article>
         <article className="panel">
           <div className="panel-head"><h2>{t('by_brand')}</h2></div>
-          {view.brandRows.length === 0 ? <p className="hint">{t('brand_empty')}</p> : (
+          {view.brandRows.length === 0 ? <EmptyState kind="brand" text={t('brand_empty')} compact /> : (
             <ol className="rank">
               {view.brandRows.map((row) => (
                 <li key={row.name}>

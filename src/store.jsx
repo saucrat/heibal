@@ -241,6 +241,12 @@ export function StoreProvider({ children }) {
     saveShipment(input) {
       return run('/api/shipments', { method: 'POST', body: JSON.stringify(input) }, 'shipment_ok');
     },
+    updateShipment(id, input) {
+      return run(`/api/shipments/${id}`, { method: 'PUT', body: JSON.stringify(input) }, 'shipment_ok');
+    },
+    removeShipment(id) {
+      return run(`/api/shipments/${id}`, { method: 'DELETE' }, 'deleted');
+    },
     addShipmentPerfume(id, input) {
       return run(`/api/shipments/${id}/perfumes`, { method: 'POST', body: JSON.stringify(input) }, 'product_ok');
     },
@@ -284,38 +290,54 @@ export function StoreProvider({ children }) {
       URL.revokeObjectURL(link.href);
       toast(tr(dataRef.current.lang, 'saved'));
     },
-    importData(file) {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const parsed = sanitize(JSON.parse(String(reader.result)));
-          if (!parsed) {
-            toast(tr(dataRef.current.lang, 'import_error'));
-            return;
-          }
-          const result = await run('/api/import', { method: 'POST', body: JSON.stringify(parsed) }, 'imported');
-          if (!result?.error) {
-            setCart([]);
-            setReceipt(null);
-          }
-        } catch {
-          toast(tr(dataRef.current.lang, 'import_error'));
-        }
-      };
-      reader.readAsText(file);
+    async confirmPin(pin) {
+      return request('/api/pin', { method: 'POST', body: JSON.stringify({ pin }) });
     },
-    async resetData() {
+    importData(file, pin) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const parsed = sanitize(JSON.parse(String(reader.result)));
+            if (!parsed) {
+              toast(tr(dataRef.current.lang, 'import_error'));
+              resolve({ error: 'import_error' });
+              return;
+            }
+            const result = await run('/api/import', {
+              method: 'POST',
+              body: JSON.stringify({ ...parsed, pin }),
+            }, 'imported');
+            if (!result?.error) {
+              setCart([]);
+              setReceipt(null);
+            }
+            resolve(result || { error: 'import_error' });
+          } catch {
+            toast(tr(dataRef.current.lang, 'import_error'));
+            resolve({ error: 'import_error' });
+          }
+        };
+        reader.onerror = () => {
+          toast(tr(dataRef.current.lang, 'import_error'));
+          resolve({ error: 'import_error' });
+        };
+        reader.readAsText(file);
+      });
+    },
+    async resetData(pin) {
       const lang = dataRef.current.lang;
       const nextCurrency = dataRef.current.settings.currency;
       const result = await run('/api/reset', {
         method: 'POST',
-        body: JSON.stringify({ lang, currency: nextCurrency }),
+        body: JSON.stringify({ lang, currency: nextCurrency, pin }),
       }, 'cleared');
       if (!result?.error) {
         setCart([]);
         setReceipt(null);
         setPage('dashboard');
       }
+      return result;
     },
   };
 

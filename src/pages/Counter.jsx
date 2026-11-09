@@ -3,6 +3,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { assetUrl } from '../api.js';
 import { displayName, parseMoney, productMeta, roundMoney, secondaryName } from '../format.js';
 import { canPortion, isLow, maxPortions, portionPrice } from '../logic.js';
+import { EmptyState } from '../empty.jsx';
 import { ProductModal, productToForm } from '../modals.jsx';
 import { useStore } from '../store.jsx';
 import { Confirm, Select } from '../ui.jsx';

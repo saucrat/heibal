@@ -1,6 +1,5 @@
 import {
   activeSales,
-  dueReminders,
   expenseTotal,
   investmentOf,
   isLow,
@@ -24,6 +23,7 @@ import {
   startOfDay,
 } from '../format.js';
 import { assetUrl } from '../api.js';
+import { EmptyState } from '../empty.jsx';
 import { useStore } from '../store.jsx';
 import { Chart, PerfumePhotos } from '../ui.jsx';
 
@@ -53,7 +53,6 @@ export function Dashboard() {
   const collected = loanCollected(books.loans);
   const owed = loanOutstanding(books.loans);
   const invested = investmentOf(books.shipments, restocks);
-  const reminders = dueReminders(books.loans);
   const cashOn = (day) => (loans || []).reduce((sum, loan) => (
     sum + (loan.payments || []).filter((pay) => isSameDay(pay.at, day)).reduce((part, pay) => part + Number(pay.amount || 0), 0)
   ), 0);
@@ -100,12 +99,18 @@ export function Dashboard() {
             {compare ? <span className="delta-pill">{compare}</span> : null}
           </div>
           {emptyBook ? (
-            <div className="stage-empty">
-              <p className="hint">{t('empty_text')}</p>
-              <button type="button" className="btn btn-gold" onClick={openNewProduct}>{t('new_arrivage')}</button>
-            </div>
-          ) : <p className="eyebrow chart-label">{t('chart_title')}</p>}
-          <Chart rows={chart} empty={t('chart_empty')} />
+            <EmptyState
+              kind="desk"
+              title={t('empty_title')}
+              text={t('empty_text')}
+              action={<button type="button" className="btn btn-gold" onClick={openNewProduct}>{t('new_arrivage')}</button>}
+            />
+          ) : (
+            <>
+              <p className="eyebrow chart-label">{t('chart_title')}</p>
+              <Chart rows={chart} empty={t('chart_empty')} />
+            </>
+          )}
         </article>
         <aside className="ledger">
           <div className="ledger-row">
@@ -144,24 +149,13 @@ export function Dashboard() {
         <div><span>{t('nav_expenses')}</span><strong dir="ltr">{money(spent)}</strong></div>
         <div><span>{t('investment')}</span><strong dir="ltr">{money(invested)}</strong></div>
       </section>
-      {reminders.length > 0 ? (
-        <ul className="reminders">
-          {reminders.map((loan) => (
-            <li key={loan.id}>
-              <button type="button" className="text-btn" onClick={() => setPage('loans')}>{loan.client}</button>
-              <span>{t('reminder_left', { n: money(loan.total - loan.paid) })}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
       <section className="dash-grid">
         <article className="panel">
           <div className="panel-head">
             <h2>{t('recent')}</h2>
             <button type="button" className="text-btn" onClick={() => setPage('journal')}>{t('nav_journal')}</button>
           </div>
-          {sales.length === 0 ? <p className="hint">{t('recent_empty')}</p> : (
+          {sales.length === 0 ? <EmptyState kind="sales" text={t('recent_empty')} compact /> : (
             <ul className="move-list">
               {sales.slice(0, 6).map((sale) => (
                 <li key={sale.id}>
@@ -193,7 +187,7 @@ export function Dashboard() {
               <button type="button" className="text-btn" onClick={() => openProducts('low')}>{t('see_all')}</button>
             ) : null}
           </div>
-          {alerts.length === 0 ? <p className="hint">{t('alerts_empty')}</p> : (
+          {alerts.length === 0 ? <EmptyState kind="calm" text={t('alerts_empty')} compact /> : (
             <ul className="alert-list">
               {alerts.slice(0, 6).map((product) => (
                 <li key={product.id}>

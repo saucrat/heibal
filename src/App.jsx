@@ -27,7 +27,7 @@ import { Shipments } from './pages/Shipments.jsx';
 import { Stats } from './pages/Stats.jsx';
 import { StoreProvider, useStore } from './store.jsx';
 import { Modal } from './ui.jsx';
-import { dueReminders, maxPortions, portionPrice } from './logic.js';
+import { maxPortions, portionPrice } from './logic.js';
 
 const NAV = [
   ['dashboard', 'nav_dashboard', LayoutDashboard],
@@ -109,7 +109,7 @@ function DeskCommand({ open, onOpenChange }) {
 function Shell() {
   const {
     t, lang, page, setPage, cart, setLang, settingsOpen, setSettingsOpen,
-    receipt, setReceipt, toasts, ready, logout, loans,
+    receipt, setReceipt, toasts, ready, logout,
   } = useStore();
   const [commandOpen, setCommandOpen] = useState(false);
 
@@ -125,7 +125,6 @@ function Shell() {
   }, []);
 
   const ticketCount = cart.reduce((sum, line) => sum + line.qty, 0);
-  const reminders = dueReminders(loans || []);
   const dateLabel = new Date().toLocaleDateString(localeOf(lang), {
     weekday: 'long',
     day: 'numeric',
@@ -155,7 +154,6 @@ function Shell() {
               <Icon size={18} strokeWidth={1.75} />
               <span>{t(key)}</span>
               {id === 'counter' && ticketCount > 0 ? <em className="nav-count" dir="ltr">{ticketCount}</em> : null}
-              {id === 'loans' && reminders.length > 0 ? <em className="nav-count" dir="ltr">{reminders.length}</em> : null}
             </button>
           ))}
         </nav>
