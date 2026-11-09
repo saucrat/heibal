@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: heibal-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_DB
+        value: parfumes7b
+      - key: ALLOW_DANGEROUS
+        value: "0"
+      - key: MONGO_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
